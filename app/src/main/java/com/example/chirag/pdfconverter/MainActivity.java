@@ -1,5 +1,7 @@
 package com.example.chirag.pdfconverter;
 
+import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -7,20 +9,21 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.StrictMode;
 import android.provider.MediaStore;
+import android.support.annotation.NonNull;
 import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.Snackbar;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
-import com.bumptech.glide.Glide;
 import com.example.chirag.pdfconverter.adapters.ImagesAdapter;
 
 import java.io.File;
@@ -28,7 +31,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -40,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private ArrayList<String> images;
 
     ImageView image;
+    FloatingActionButton fab;
 
     RecyclerView mRecyclerView;
     RecyclerView.Adapter adapter;
@@ -55,22 +58,12 @@ public class MainActivity extends AppCompatActivity {
 
         StrictMode.VmPolicy.Builder builder = new StrictMode.VmPolicy.Builder();
         StrictMode.setVmPolicy(builder.build());
+
+        checkPermission();
         images = new ArrayList<>();
 
-        mRecyclerView = (RecyclerView)findViewById(R.id.recycler_view);
-//        adapter = new ImagesAdapter(null, this);
 
-        image =(ImageView)findViewById(R.id.image);
 
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-               if(hasCamera()){
-                   saveImage();
-               }
-            }
-        });
     }
 
     @Override
@@ -90,6 +83,10 @@ public class MainActivity extends AppCompatActivity {
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
+        }
+        else if(id == R.id.save_to_pdf){
+            PdfUtils.covertToPdf(images);
+            showFile();
         }
 
         return super.onOptionsItemSelected(item);
@@ -129,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Save a file: path for use with ACTION_VIEW intents
         mCurrentPhotoPath = image.getAbsolutePath();
+        Log.i(TAG, "image path: "+mCurrentPhotoPath);
         return image;
     }
     private boolean hasCamera(){
@@ -162,5 +160,79 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+    void checkPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            //if permission granted, initialize the views
+
+            initViews();
+//            if(!fileExistance("test.pdf")){
+//            }
+//            else {
+//                showFile();
+//            }
+        } else {
+            //show the dialog requesting to grant permission
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+        }
+    }
+    private void showFile(){
+        File pdfFile = new File(PdfUtils.BASE_PDF_DIRECTORY + "/" + "example.pdf");  // -> filename = maven.pdf
+        Uri path = Uri.fromFile(pdfFile);
+        Log.d(TAG, "file path: " + path);
+        Intent pdfIntent = new Intent(Intent.ACTION_VIEW);
+        pdfIntent.setDataAndType(path, "application/pdf");
+        pdfIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+        try {
+            Toast.makeText(MainActivity.this, "Pdf successfully created!", Toast.LENGTH_SHORT).show();
+            startActivity(pdfIntent);
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(MainActivity.this, "No Application available to view PDF", Toast.LENGTH_SHORT).show();
+        }
+    }
+    private boolean fileExistance(String fileName){
+        String path = Environment.getExternalStorageDirectory() + "/papers/" + fileName;
+        File file = new File(path);
+        Log.d(TAG, "path check:" + path);
+        return file.exists();
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case 1:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+//                    if (!fileExistance("test.pdf")){
+//                    }
+//                    else
+//                        showFile();
+                    initViews();
+
+                } else {
+                    //permission is denied (this is the first time, when "never ask again" is not checked)
+                    if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.READ_EXTERNAL_STORAGE)) {
+                        finish();
+                    }
+                }
+        }
+    }
+
+    private void initViews(){
+        mRecyclerView = (RecyclerView)findViewById(R.id.recycler_view);
+//        adapter = new ImagesAdapter(null, this);
+
+        image =(ImageView)findViewById(R.id.image);
+
+      fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(hasCamera()){
+                    saveImage();
+                }
+            }
+        });
+    }
+
+
 
 }
